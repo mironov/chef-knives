@@ -27,20 +27,20 @@ def main
       long '--help'
       short '-h'
       desc 'Show this message'
-      action do 
+      action do
         Choice.help
         exit
       end
     end
 
-    option :match do 
+    option :match do
       default '.*'
       long '--match=REGEXP'
       short '-m'
       desc 'Match only the nodes with an FQDN matching this value'
     end
 
-    option :no_ifaces do 
+    option :no_ifaces do
       long '--no-ifaces'
       desc 'Do not print network interfaces'
     end
@@ -48,32 +48,30 @@ def main
 
   db = CouchRest.database(CHEF_DB_URL)
 
-  db.documents['rows'].each do |doc|
-    if doc['id'] =~ /node_/
-      node = db.get(doc['id'])
-      next if  node.fqdn !~ /#{Choice.choices[:match]}/
-      plat = node.platform+node.platform_version
-      fqdn = node.fqdn
-      puts fqdn
-      puts "-------------"
-      puts "Platform: " + plat
-      puts "Uptime: " + node.uptime
-      puts "Memory Total: " + humanize_bytes(node.memory.total.gsub('kB','').to_i * 1024)
-      puts "Memory Free: " + humanize_bytes(node.memory.free.gsub('kB','').to_i * 1024)
-      puts "Is a Virtual Machine?: #{(node.virtualization.role == 'guest') rescue false}"
-      if not Choice.choices[:no_ifaces]
-        puts "Network Interfaces: "
-        node.network.interfaces.each_key do |iface|
-          next unless node.network.interfaces[iface][:addresses]
-          puts "  #{iface}"
-          node.network.interfaces[iface].addresses.each_key do |a|
-            print "    #{a}".ljust(30)
-            puts "    [#{node.network.interfaces[iface].addresses[a].family}]"
-          end
+  db.view("nodes/all")['rows'].each do |doc|
+    node = doc["value"]["automatic"]
+    next if  node["fqdn"] !~ /#{Choice.choices[:match]}/
+    plat = node["platform"]+node["platform_version"]
+    fqdn = node["fqdn"]
+    puts fqdn
+    puts "-------------"
+    puts "Platform: " + plat
+    puts "Uptime: " + node["uptime"]
+    puts "Memory Total: " + humanize_bytes(node["memory"]["total"].gsub('kB','').to_i * 1024)
+    puts "Memory Free: " + humanize_bytes(node["memory"]["free"].gsub('kB','').to_i * 1024)
+    puts "Is a Virtual Machine?: #{(node["virtualization"]["role"] == 'guest') rescue false}"
+    if not Choice.choices[:no_ifaces]
+      puts "Network Interfaces: "
+      node["network"]["interfaces"].each_key do |iface|
+        next unless node["network"]["interfaces"][iface]["addresses"]
+        puts "  #{iface}"
+        node["network"]["interfaces"][iface]["addresses"].each_key do |a|
+          print "    #{a}".ljust(30)
+          puts "    [#{node["network"]["interfaces"][iface]["addresses"][a]["family"]}]"
         end
       end
-      puts
     end
+    puts
   end
 end
 

@@ -16,7 +16,7 @@ def main
       long '--help'
       short '-h'
       desc 'Show this message'
-      action do 
+      action do
         Choice.help
         exit
       end
@@ -28,7 +28,7 @@ def main
       desc 'Print only the filesystems with usage percent greater than this value'
     end
 
-    option :match do 
+    option :match do
       default '.*'
       long '--match'
       short '-m'
@@ -38,29 +38,27 @@ def main
 
   db = CouchRest.database(CHEF_DB_URL)
 
-  db.documents['rows'].each do |doc|
-    if doc['id'] =~ /node_/
-      node = db.get(doc['id'])
-      next if  node.fqdn !~ /#{Choice.choices[:match]}/
-      matching_fs = []
-      node.filesystem.each do |fsname,fsattrs|
-        if not (%w[proc configfs binfmt_misc none sysfs tmpfs devpts usbfs rpc_pipefs].include? fsattrs['fs_type'])
-          if Choice.choices[:usage_threshold]
-            uthres = Choice.choices[:usage_threshold].to_i
-            usage = fsattrs['percent_used'].chomp.strip.gsub('%','').to_i rescue 100
-            (matching_fs << "    #{fsname}".ljust(50) + fsattrs['percent_used']) if usage > uthres
-          else
-            matching_fs << "    #{fsname}".ljust(50) + (fsattrs['percent_used'] || '')
-          end
+  db.view("nodes/all")['rows'].each do |doc|
+    node = doc["value"]["automatic"]
+    next if  node["fqdn"] !~ /#{Choice.choices[:match]}/
+    matching_fs = []
+    node["filesystem"].each do |fsname,fsattrs|
+      if not (%w[proc configfs binfmt_misc none sysfs tmpfs devpts usbfs rpc_pipefs].include? fsattrs['fs_type'])
+        if Choice.choices[:usage_threshold]
+          uthres = Choice.choices[:usage_threshold].to_i
+          usage = fsattrs['percent_used'].chomp.strip.gsub('%','').to_i rescue 100
+          (matching_fs << "    #{fsname}".ljust(50) + (fsattrs['percent_used'] || '')) if usage > uthres
+        else
+          matching_fs << "    #{fsname}".ljust(50) + (fsattrs['percent_used'] || '')
         end
       end
-      if not matching_fs.empty?
-        puts node.fqdn
-        matching_fs.each do |fs|
-          puts fs
-        end
-        puts
+    end
+    if not matching_fs.empty?
+      puts node["fqdn"]
+      matching_fs.each do |fs|
+        puts fs
       end
+      puts
     end
   end
 
